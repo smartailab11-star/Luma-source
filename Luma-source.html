@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>💻 Luma Source Code Viewer Pro</title>
+
+  <!-- Highlight.js for syntax coloring -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/html.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background: #000;
+      color: #00e0ff;
+      text-align: center;
+      transition: 0.3s;
+    }
+
+    h1 {
+      margin-top: 20px;
+      text-shadow: 0 0 10px #00ffff;
+    }
+
+    input, button, select {
+      margin: 6px;
+      padding: 10px;
+      border: 1px solid #00ffff66;
+      border-radius: 8px;
+      background: transparent;
+      color: inherit;
+      outline: none;
+      transition: all 0.3s;
+    }
+
+    button {
+      cursor: pointer;
+      background: #00ffff20;
+    }
+    button:hover {
+      background: #00ffff55;
+    }
+
+    #output {
+      width: 92%;
+      margin: 20px auto;
+      text-align: left;
+      background: #0a0a0a;
+      border-radius: 10px;
+      border: 1px solid #00ffff33;
+      padding: 15px;
+      min-height: 400px;
+      overflow-x: auto;
+      font-family: "Fira Code", monospace;
+      white-space: pre;
+    }
+
+    /* Light mode */
+    .light {
+      background: #f5f5f5;
+      color: #111;
+    }
+    .light #output {
+      background: #fff;
+      color: #111;
+      border-color: #ccc;
+    }
+
+    /* Lock screen */
+    #lockScreen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      transition: opacity 0.5s ease;
+    }
+    #lockScreen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #lockBox {
+      background: rgba(20,20,20,0.85);
+      padding: 30px;
+      border-radius: 15px;
+      text-align: center;
+      box-shadow: 0 0 25px #00ffffaa;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    #introText {
+      color: #00e0ff;
+      margin-bottom: 15px;
+      text-shadow: 0 0 10px #00ffff;
+    }
+
+    #lockMessage {
+      color: #ff4444;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>💻 Luma Source Code Viewer Pro</h1>
+  <div>
+    <input type="text" id="urlInput" placeholder="Enter raw code URL" />
+    <button onclick="viewSource()">🔍 View Source</button>
+    <button onclick="copySource()">📋 Copy</button>
+    <button onclick="downloadSource()">💾 Download</button>
+    <button onclick="clearOutput()">🧹 Clear</button>
+    <button onclick="toggleTheme()">🌗 Theme</button>
+  </div>
+
+  <select id="recentLinks" onchange="loadRecentLink()">
+    <option>-- Select recent link --</option>
+  </select>
+
+  <pre><code id="output" class="hljs">🔒 Locked — enter password to unlock.</code></pre>
+
+  <!-- Lock Screen -->
+  <div id="lockScreen">
+    <div id="lockBox">
+      <div id="introText">
+        👋 Welcome to <b>Luma Source Code Viewer Pro</b><br>
+        Enter the access password below to continue.
+      </div>
+      <input type="password" id="unlockPassword" placeholder="Enter password" />
+      <button onclick="unlockApp()">Unlock</button>
+      <p id="lockMessage"></p>
+    </div>
+  </div>
+
+  <script>
+    const correctPassword = "luma2025";
+
+    function unlockApp() {
+      const input = document.getElementById("unlockPassword").value;
+      const msg = document.getElementById("lockMessage");
+      if (input === correctPassword) {
+        msg.style.color = "#00ff88";
+        msg.textContent = "✅ Access Granted!";
+        setTimeout(() => document.getElementById("lockScreen").classList.add("hidden"), 600);
+      } else {
+        msg.textContent = "❌ Incorrect password!";
+      }
+    }
+
+    async function viewSource() {
+      const url = document.getElementById("urlInput").value.trim();
+      const output = document.getElementById("output");
+      if (!url) return (output.textContent = "⚠️ Please enter a valid URL.");
+
+      output.textContent = "⏳ Fetching source...";
+      try {
+        const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+        const res = await fetch(proxy);
+        if (!res.ok) throw new Error("Network error " + res.status);
+        const text = await res.text();
+        output.textContent = text;
+
+        // highlight syntax
+        hljs.highlightElement(output);
+
+        // Save to recents
+        let recents = JSON.parse(localStorage.getItem("recentLinks") || "[]");
+        if (!recents.includes(url)) recents.unshift(url);
+        if (recents.length > 5) recents.pop();
+        localStorage.setItem("recentLinks", JSON.stringify(recents));
+        loadRecentOptions();
+      } catch (e) {
+        output.textContent = "🚫 Failed to fetch.\n" + e.message;
+      }
+    }
+
+    function copySource() {
+      const text = document.getElementById("output").textContent;
+      navigator.clipboard.writeText(text);
+      alert("✅ Source copied!");
+    }
+
+    function downloadSource() {
+      const text = document.getElementById("output").textContent;
+      const blob = new Blob([text], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "source.txt";
+      a.click();
+    }
+
+    function clearOutput() {
+      document.getElementById("output").textContent = "";
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("light");
+    }
+
+    function loadRecentOptions() {
+      const recent = JSON.parse(localStorage.getItem("recentLinks") || "[]");
+      const sel = document.getElementById("recentLinks");
+      sel.innerHTML = '<option>-- Select recent link --</option>';
+      recent.forEach(link => {
+        const opt = document.createElement("option");
+        opt.value = link;
+        opt.textContent = link;
+        sel.appendChild(opt);
+      });
+    }
+
+    function loadRecentLink() {
+      const sel = document.getElementById("recentLinks");
+      document.getElementById("urlInput").value = sel.value;
+    }
+
+    window.onload = loadRecentOptions;
+  </script>
+</body>
+</html>
